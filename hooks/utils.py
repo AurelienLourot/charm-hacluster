@@ -31,6 +31,8 @@ from base64 import b64decode
 
 from charmhelpers.core.hookenv import (
     local_unit,
+    is_leader,
+    leader_get,
     log,
     DEBUG,
     ERROR,
@@ -77,6 +79,7 @@ from charmhelpers.contrib.network import ip as utils
 
 import netifaces
 from netaddr import IPNetwork
+from netaddr.core import AddrFormatError
 import jinja2
 
 
@@ -192,6 +195,27 @@ def get_ipv6_network_address(iface):
     msg = "No valid network found for interface '%s'" % iface
     status_set('blocked', msg)
     raise Exception(msg)
+
+
+def get_private_addr_and_subnet_cidr():
+    # Returns private_address, private_subnet.
+    #   private_address: private-address from
+    #                    https://jaas.ai/docs/charm-network-primitives
+    #                    e.g. '10.5.0.4'.
+    #   private_subnet:  e.g. '10.5.0.0/16'. '<private_address>/32' if couldn't
+    #                    be determined.
+    private_address = utils.get_relation_ip('hanode')
+    private_netmask = utils.get_netmask_for_address(
+        private_address)  # e.g. 255.255.0.0
+    try:
+        private_subnet = str(IPNetwork(
+            '{}/{}'.format(private_address, private_netmask)
+        ).cidr)  # e.g. 10.5.0.0/16
+    except AddrFormatError:
+        # Happens if private_address and/or private_netmask are empty or
+        # malformed.
+        private_subnet = '{}/32'.format(private_address)
+    return private_address, private_subnet
 
 
 def get_corosync_id(unit_name):
@@ -1195,6 +1219,22 @@ def assess_status_helper():
             status = 'blocked'
             message = ("Insufficient peer units for ha cluster "
                        "(require {})".format(node_count))
+
+    # Implements LP: #1850129
+    if status == 'active' and not is_leader():
+        _, private_subnet = get_private_addr_and_subnet_cidr()
+        log("Current unit's private subnet: {}".format(private_subnet),
+            level=DEBUG)
+        leader_private_subnet = leader_get('private_subnet')
+        log("Leader's private subnet: {}".format(leader_private_subnet),
+            level=DEBUG)
+        if leader_private_subnet != private_subnet:
+            status = 'blocked'
+            message = 'Units are in different subnets: '
+            message += 'current={}, leader={}'.format(
+                private_subnet, leader_private_subnet
+            )
+            log(message, level=ERROR)
 
     # if the status was not changed earlier, we verify the maintenance status
     try:

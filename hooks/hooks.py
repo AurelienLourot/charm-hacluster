@@ -37,6 +37,7 @@ import pcmk
 
 from charmhelpers.core.hookenv import (
     is_leader,
+    leader_set,
     log,
     DEBUG,
     INFO,
@@ -55,10 +56,6 @@ from charmhelpers.core.host import (
     service_running,
     lsb_release,
     CompareHostReleases,
-)
-
-from charmhelpers.contrib.network.ip import (
-    get_relation_ip,
 )
 
 from charmhelpers.contrib.openstack.utils import (
@@ -92,6 +89,7 @@ from utils import (
     disable_lsb_services,
     disable_upstart_services,
     get_ip_addr_from_resource_params,
+    get_private_addr_and_subnet_cidr,
     validate_dns_ha,
     setup_maas_api,
     setup_ocf_files,
@@ -232,10 +230,17 @@ def upgrade_charm():
 
 @hooks.hook('hanode-relation-joined')
 def hanode_relation_joined(relid=None):
+    private_address, private_subnet = get_private_addr_and_subnet_cidr()
+    log("Current unit's private address: {}".format(private_address),
+        level=DEBUG)
+    log("Current unit's private subnet: {}".format(private_subnet),
+        level=DEBUG)
     relation_set(
         relation_id=relid,
-        relation_settings={'private-address': get_relation_ip('hanode')}
+        relation_settings={'private-address': private_address}
     )
+    if is_leader():
+        leader_set(private_subnet=private_subnet)
 
 
 @hooks.hook('ha-relation-joined',

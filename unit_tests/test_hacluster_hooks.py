@@ -426,17 +426,25 @@ class TestHooks(test_utils.CharmTestCase):
         write_maas_dns_address.assert_called_with(
             "res_keystone_public_hostname", "172.16.0.1")
 
-    @mock.patch.object(hooks, 'get_relation_ip')
+    @mock.patch.object(hooks, 'leader_set')
+    @mock.patch.object(hooks, 'is_leader')
     @mock.patch.object(hooks, 'relation_set')
-    def test_hanode_relation_joined(self,
-                                    mock_relation_set,
-                                    mock_get_relation_ip):
-        mock_get_relation_ip.return_value = '10.10.10.2'
+    @mock.patch.object(hooks, 'get_private_addr_and_subnet_cidr')
+    def test_hanode_relation_joined(
+            self, mock_get_private_addr_and_subnet_cidr, mock_relation_set,
+            mock_is_leader, mock_leader_set
+    ):
+        mock_get_private_addr_and_subnet_cidr.return_value = (
+            '10.10.10.2', '10.10.10.0/24'
+        )
+        mock_is_leader.return_value = True
         hooks.hanode_relation_joined('hanode:1')
-        mock_get_relation_ip.assert_called_once_with('hanode')
         mock_relation_set.assert_called_once_with(
             relation_id='hanode:1',
             relation_settings={'private-address': '10.10.10.2'}
+        )
+        mock_leader_set.assert_called_once_with(
+            private_subnet='10.10.10.0/24'
         )
 
     @mock.patch.object(hooks, 'get_pcmkr_key')
