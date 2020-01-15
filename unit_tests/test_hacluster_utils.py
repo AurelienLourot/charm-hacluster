@@ -1030,3 +1030,57 @@ class UtilsTestCase(unittest.TestCase):
                                     '$id="rsc-options" '
                                     'resource-stickiness="100" '
                                     'failure-timeout=240')
+
+    @mock.patch.object(utils.utils, 'get_netmask_for_address')
+    @mock.patch.object(utils.utils, 'get_relation_ip')
+    def test_get_private_addr_and_subnet_cidr(self, mock_get_relation_ip,
+                                              mock_get_netmask_for_address):
+        mock_get_relation_ip.return_value = '10.5.0.4'
+        mock_get_netmask_for_address.return_value = '255.255.0.0'
+        self.assertEqual(utils.get_private_addr_and_subnet_cidr(),
+                         ('10.5.0.4', '10.5.0.0/16'))
+
+    @mock.patch.object(utils.utils, 'get_netmask_for_address')
+    @mock.patch.object(utils.utils, 'get_relation_ip')
+    def test_get_private_addr_and_subnet_cidr_not_raising(
+            self, mock_get_relation_ip, mock_get_netmask_for_address
+    ):
+        mock_get_relation_ip.return_value = 'invalid-address'
+        mock_get_netmask_for_address.return_value = 'invalid-mask'
+
+        # Most importantly here we test that the function under test isn't
+        # raising:
+        self.assertEqual(utils.get_private_addr_and_subnet_cidr(),
+                         ('invalid-address', 'invalid-address/32'))
+
+    @mock.patch.object(utils, 'get_resources')
+    @mock.patch.object(utils, 'leader_get')
+    @mock.patch.object(utils, 'get_private_addr_and_subnet_cidr')
+    @mock.patch.object(utils, 'is_leader')
+    @mock.patch.object(utils, 'relation_ids')
+    @mock.patch.object(utils, 'try_pcmk_wait')
+    @mock.patch.object(utils, 'config')
+    @mock.patch.object(utils, 'is_unit_paused_set')
+    @mock.patch.object(utils, 'is_unit_upgrading_set')
+    def test_assess_status_helper_with_different_subnets(
+            self, mock_is_unit_upgrading_set, mock_is_unit_paused_set,
+            mock_config, mock_try_pcmk_wait, mock_relation_ids, mock_is_leader,
+            mock_get_private_addr_and_subnet_cidr, mock_leader_get,
+            mock_get_resources
+    ):
+        # Tests that if the current unit has a different private subnet as the
+        # leader it will be marked as blocked.
+
+        mock_is_unit_upgrading_set.return_value = False
+        mock_is_unit_paused_set.return_value = False
+        mock_config.return_value = 42
+        mock_relation_ids.return_value = []
+        mock_is_leader.return_value = False
+        mock_get_private_addr_and_subnet_cidr.return_value = ('192.168.0.42',
+                                                              '192.168.0.0/24')
+        mock_leader_get.return_value = ('10.10.0.5',
+                                        '10.10.0.0/16')
+        mock_get_resources.return_value = {}
+
+        actual_status, _ = utils.assess_status_helper()
+        self.assertEqual(actual_status, 'blocked')
