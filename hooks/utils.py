@@ -1231,9 +1231,10 @@ def assess_status_helper():
         if leader_private_subnet != private_subnet:
             status = 'blocked'
             message = 'Units are in different subnets: '
-            message += 'current={}, leader={}'.format(
+            message += 'current={}, leader={}. '.format(
                 private_subnet, leader_private_subnet
             )
+            message += "Use 'juju bind' to fix it?"
             log(message, level=ERROR)
 
     # if the status was not changed earlier, we verify the maintenance status
