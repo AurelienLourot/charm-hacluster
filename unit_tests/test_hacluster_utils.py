@@ -1054,6 +1054,7 @@ class UtilsTestCase(unittest.TestCase):
                          ('invalid-address', 'invalid-address/32'))
 
     @mock.patch.object(utils, 'get_resources')
+    @mock.patch.object(utils.utils, 'get_address_in_network')
     @mock.patch.object(utils, 'leader_get')
     @mock.patch.object(utils, 'get_private_addr_and_subnet_cidr')
     @mock.patch.object(utils, 'is_leader')
@@ -1066,7 +1067,7 @@ class UtilsTestCase(unittest.TestCase):
             self, mock_is_unit_upgrading_set, mock_is_unit_paused_set,
             mock_config, mock_try_pcmk_wait, mock_relation_ids, mock_is_leader,
             mock_get_private_addr_and_subnet_cidr, mock_leader_get,
-            mock_get_resources
+            mock_get_address_in_network, mock_get_resources
     ):
         # Tests that if the current unit has a different private subnet as the
         # leader it will be marked as blocked.
@@ -1080,6 +1081,7 @@ class UtilsTestCase(unittest.TestCase):
                                                               '192.168.0.0/24')
         mock_leader_get.return_value = ('10.10.0.5',
                                         '10.10.0.0/16')
+        mock_get_address_in_network.return_value = None
         mock_get_resources.return_value = {}
 
         actual_status, _ = utils.assess_status_helper()

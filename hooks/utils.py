@@ -202,8 +202,8 @@ def get_private_addr_and_subnet_cidr():
     #   private_address: private-address from
     #                    https://jaas.ai/docs/charm-network-primitives
     #                    e.g. '10.5.0.4'.
-    #   private_subnet:  e.g. '10.5.0.0/16'. '<private_address>/32' if couldn't
-    #                    be determined.
+    #   private_subnet:  private-address's subnet, e.g. '10.5.0.0/16'.
+    #                    '<private_address>/32' if couldn't be determined.
     private_address = utils.get_relation_ip('hanode')
     private_netmask = utils.get_netmask_for_address(
         private_address)  # e.g. 255.255.0.0
@@ -1229,13 +1229,19 @@ def assess_status_helper():
         log("Leader's private subnet: {}".format(leader_private_subnet),
             level=DEBUG)
         if leader_private_subnet != private_subnet:
-            status = 'blocked'
-            message = 'Units are in different subnets: '
-            message += 'current={}, leader={}. '.format(
-                private_subnet, leader_private_subnet
-            )
-            message += "Use 'juju bind' to fix it?"
-            log(message, level=ERROR)
+            addr_in_leader_private_subnet = \
+                utils.get_address_in_network(leader_private_subnet)
+            if addr_in_leader_private_subnet is not None:
+                log("Current unit's address in leader's private subnet: " +
+                    addr_in_leader_private_subnet, level=DEBUG)
+            else:
+                status = 'blocked'
+                message = 'Units are in different subnets: '
+                message += 'current={}, leader={}. '.format(
+                    private_subnet, leader_private_subnet
+                )
+                message += "Use 'juju bind' to fix it?"
+                log(message, level=ERROR)
 
     # if the status was not changed earlier, we verify the maintenance status
     try:
