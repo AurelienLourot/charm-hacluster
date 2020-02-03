@@ -135,12 +135,20 @@ def enable_lsb_services(*services):
         subprocess.check_call(['update-rc.d', '-f', service, 'defaults'])
 
 
+def str_to_ioctl_arg(string):
+    # struct.pack() expects for 's' a string on python 2 and bytes on python 3:
+    try:
+        return struct.pack('256s', string)
+    except struct.error:
+        return struct.pack('256s', bytes(string, 'ascii'))
+
+
 def get_iface_ipaddr(iface):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     return socket.inet_ntoa(fcntl.ioctl(
         s.fileno(),
         0x8919,  # SIOCGIFADDR
-        struct.pack('256s', iface[:15])
+        str_to_ioctl_arg(iface[:15])
     )[20:24])
 
 
@@ -149,7 +157,7 @@ def get_iface_netmask(iface):
     return socket.inet_ntoa(fcntl.ioctl(
         s.fileno(),
         0x891b,  # SIOCGIFNETMASK
-        struct.pack('256s', iface[:15])
+        str_to_ioctl_arg(iface[:15])
     )[20:24])
 
 
